@@ -193,10 +193,33 @@ async function runAutomation(url, searchKeyword, options = {}) {
     // Tạo page mới (hoặc dùng page hiện có)
     const page = await browser.newPage();
 
+
     // Set user agent để tránh bị detect bot
     await page.setUserAgent(
       'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
     );
+
+    // Set viewport lớn để tránh sidebar che nội dung
+    await page.setViewport({
+      width: 1920,
+      height: 1080,
+      deviceScaleFactor: 1,
+    });
+    console.log('📐 Đã set viewport: 1920x1080');
+
+    // Maximize window (nếu không phải headless)
+    try {
+      const session = await page.target().createCDPSession();
+      const { windowId } = await session.send('Browser.getWindowForTarget');
+      await session.send('Browser.setWindowBounds', {
+        windowId,
+        bounds: { windowState: 'maximized' }
+      });
+      console.log('🖥️ Đã maximize browser window');
+    } catch (e) {
+      console.log('⚠️ Không thể maximize window (có thể là headless mode)');
+    }
+
 
     // Tối ưu hóa: Chặn các resource không cần thiết để load nhanh hơn
     await page.setRequestInterception(true);
