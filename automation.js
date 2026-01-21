@@ -70,10 +70,44 @@ function findOperaPath() {
 }
 
 /**
+ * Kiểm tra xem có browser đang chạy với remote debugging không
+ * @param {number} port - Port của remote debugging (mặc định: 9222)
+ * @returns {Promise<boolean>}
+ */
+async function checkBrowserRunning(port = 9222) {
+  try {
+    const response = await fetch(`http://localhost:${port}/json/version`);
+    return response.ok;
+  } catch (error) {
+    return false;
+  }
+}
+
+/**
+ * Connect tới browser đang chạy
+ * @param {number} port - Port của remote debugging
+ * @returns {Promise<Browser>}
+ */
+async function connectToExistingBrowser(port = 9222) {
+  try {
+    const browserURL = `http://localhost:${port}`;
+    console.log(`🔗 Đang kết nối tới browser đang chạy tại port ${port}...`);
+    const browser = await puppeteer.connect({ browserURL });
+    console.log('✅ Đã kết nối thành công tới browser!');
+    return browser;
+  } catch (error) {
+    console.error('❌ Không thể kết nối tới browser:', error.message);
+    throw new Error('Không thể kết nối tới browser đang chạy. Vui lòng đảm bảo browser đã mở với remote debugging.');
+  }
+}
+
+/**
  * Chạy automation: F5, search, và click vào kết quả đầu tiên
  * @param {string} url - URL của trang web
  * @param {string} searchKeyword - Từ khóa tìm kiếm
  * @param {object} options - Tùy chọn browser và các selector tùy chỉnh
+ * @param {boolean} options.useExistingBrowser - Sử dụng browser đang mở (mặc định: true)
+ * @param {number} options.debugPort - Port của remote debugging (mặc định: 9222)
  * @param {string} options.searchSelector - CSS Selector cụ thể cho ô tìm kiếm (tùy chọn)
  * @param {string} options.resultSelector - CSS Selector cụ thể cho kết quả đầu tiên (tùy chọn)
  * @param {number} options.resultIndex - Index của kết quả muốn click (mặc định: 0 = kết quả đầu tiên)
@@ -82,58 +116,81 @@ function findOperaPath() {
  */
 async function runAutomation(url, searchKeyword, options = {}) {
   let browser;
+  let shouldCloseBrowser = true; // Đóng browser khi xong nếu là browser mới
   const MAX_RETRIES = 3;
   const TIMEOUT = 30000; // 30 seconds
+  const debugPort = options.debugPort || 9222;
 
   try {
     console.log('🌐 Đang khởi động browser...');
     
-    // Cấu hình browser
-    const launchOptions = {
-      headless: false, // Hiển thị browser để user theo dõi
-      defaultViewport: { width: 1280, height: 720 },
-      args: [
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
-        '--disable-blink-features=AutomationControlled',
-        '--disable-features=IsolateOrigins,site-per-process',
-        '--disable-web-security',
-        '--disable-dev-shm-usage',
-        '--fast-start', // Khởi động nhanh hơn
-        '--disable-extensions-except', // Tắt extensions (nhanh hơn)
-      ]
-    };
-
-    let browserFound = false;
-
-    // Bước 1: Thử tìm Opera (nếu user muốn)
-    if (options.useOpera !== false) {
-      const operaPath = findOperaPath();
-      if (operaPath) {
-        launchOptions.executablePath = operaPath;
-        console.log('🎭 Sử dụng Opera Browser (VPN sẽ hoạt động bình thường)');
-        browserFound = true;
+    // BƯỚC 1: Thử connect tới browser đang chạy (nếu user muốn)
+    if (options.useExistingBrowser !== false) {
+      console.log('🔍 Đang kiểm tra browser đang chạy...');
+      
+      try {
+        // Thử connect tới browser với remote debugging
+        browser = await connectToExistingBrowser(debugPort);
+        shouldCloseBrowser = false; // KHÔNG đóng browser đang dùng
+        console.log('✅ Sử dụng browser đang mở (tab mới sẽ được tạo)');
+      } catch (error) {
+        console.log('⚠️ Không tìm thấy browser đang chạy, sẽ mở browser mới...');
+        console.log(`💡 Tip: Để dùng browser đang mở, khởi động Opera với: --remote-debugging-port=${debugPort}`);
       }
     }
+    
+    // BƯỚC 2: Nếu chưa có browser (hoặc connect thất bại), launch browser mới
+    if (!browser) {
+      // Cấu hình browser
+      const launchOptions = {
+        headless: false, // Hiển thị browser để user theo dõi
+        defaultViewport: { width: 1280, height: 720 },
+        args: [
+          `--remote-debugging-port=${debugPort}`, // Enable remote debugging
+          '--no-sandbox',
+          '--disable-setuid-sandbox',
+          '--disable-blink-features=AutomationControlled',
+          '--disable-features=IsolateOrigins,site-per-process',
+          '--disable-web-security',
+          '--disable-dev-shm-usage',
+          '--fast-start', // Khởi động nhanh hơn
+          '--disable-extensions-except', // Tắt extensions (nhanh hơn)
+        ]
+      };
 
-    // Bước 2: Nếu không tìm thấy Opera, thử tìm Chrome/Edge
-    if (!browserFound) {
-      const chromePath = findChromePath();
-      if (chromePath) {
-        launchOptions.executablePath = chromePath;
-        console.log('🌐 Sử dụng Chrome/Edge đã cài sẵn');
-        browserFound = true;
+      let browserFound = false;
+
+      // Thử tìm Opera (nếu user muốn)
+      if (options.useOpera !== false) {
+        const operaPath = findOperaPath();
+        if (operaPath) {
+          launchOptions.executablePath = operaPath;
+          console.log('🎭 Sử dụng Opera Browser (VPN sẽ hoạt động bình thường)');
+          browserFound = true;
+        }
       }
+
+      // Bước 2: Nếu không tìm thấy Opera, thử tìm Chrome/Edge
+      if (!browserFound) {
+        const chromePath = findChromePath();
+        if (chromePath) {
+          launchOptions.executablePath = chromePath;
+          console.log('🌐 Sử dụng Chrome/Edge đã cài sẵn');
+          browserFound = true;
+        }
+      }
+
+      // Bước 3: Nếu vẫn không tìm thấy, thử dùng Puppeteer bundled Chrome
+      if (!browserFound) {
+        console.log('⏳ Đang dùng Puppeteer bundled Chrome...');
+        // Không set executablePath, để Puppeteer tự tìm
+      }
+
+      browser = await puppeteer.launch(launchOptions);
+      shouldCloseBrowser = true; // Đóng browser khi xong vì đã launch mới
     }
-
-    // Bước 3: Nếu vẫn không tìm thấy, thử dùng Puppeteer bundled Chrome
-    if (!browserFound) {
-      console.log('⏳ Đang dùng Puppeteer bundled Chrome...');
-      // Không set executablePath, để Puppeteer tự tìm
-    }
-
-    browser = await puppeteer.launch(launchOptions);
-
+    
+    // Tạo page mới (hoặc dùng page hiện có)
     const page = await browser.newPage();
 
     // Set user agent để tránh bị detect bot
@@ -230,65 +287,70 @@ async function runAutomation(url, searchKeyword, options = {}) {
       throw new Error('Không tìm thấy search box trên trang!');
     }
 
-    // Đợi kết quả search load (giảm từ 3000ms xuống 1500ms)
+    // Đợi kết quả search load
     console.log('⏳ Đang đợi kết quả search...');
-    await page.waitForTimeout(1500);
+    await page.waitForTimeout(2000); // Tăng lên 2s để chắc chắn
 
-    // Bước 4: Click vào kết quả
-    console.log('🎯 Đang tìm kết quả...');
+    // Bước 4: Tìm nút Submit và click
+    const submitButtonText = options.submitButtonText || 'Submit';
+    console.log(`🎯 Đang tìm nút có text "${submitButtonText}"...`);
     
     let clickSuccess = false;
-    const resultIndex = options.resultIndex || 0; // Mặc định click vào kết quả đầu tiên
     
-    // Nếu user cung cấp selector cụ thể cho result, ưu tiên dùng nó
-    const resultSelectors = options.resultSelector ?
-      [options.resultSelector] : // Dùng selector cụ thể nếu có
-      [
-        // Các selector phổ biến, sắp xếp theo độ ưu tiên
-        'a[href*="watch"]', // YouTube-like
-        '.search-result a',
-        '.result a',
-        '[class*="result"] a',
-        '[class*="item"] a',
-        'article a',
-        '.video-item a',
-        '.content-item a',
-        'main a', // Fallback
-        'a' // Last resort - first link on page
-      ];
-
-    for (const selector of resultSelectors) {
+    try {
+      // Đợi button xuất hiện trước
       try {
-        await page.waitForSelector(selector, { timeout: 5000 });
-        const results = await page.$$(selector);
-        
-        if (results && results.length > resultIndex) {
-          console.log(`✅ Tìm thấy ${results.length} kết quả với selector: ${selector}`);
-          
-          // Click vào kết quả tại index chỉ định
-          const targetResult = results[resultIndex];
-          
-          // Lấy href để verify
-          const href = await page.evaluate(el => el.href, targetResult);
-          console.log(`🔗 Click vào kết quả #${resultIndex + 1}: ${href}`);
-          
-          await targetResult.click();
-          clickSuccess = true;
-          break;
-        }
-      } catch (err) {
-        continue;
+        await page.waitForSelector('button', { timeout: 5000 });
+        console.log('✅ Đã thấy button trên trang');
+      } catch (e) {
+        console.log('⚠️ Timeout đợi button, nhưng sẽ thử tiếp...');
       }
-    }
-
-    if (!clickSuccess) {
-      // Fallback: click vào link đầu tiên trên trang
-      console.log('⚠️ Không tìm thấy kết quả cụ thể, thử click link đầu tiên...');
-      const allLinks = await page.$$('a[href]');
-      if (allLinks.length > resultIndex) {
-        await allLinks[resultIndex].click();
+      
+      // Đợi thêm một chút để page ổn định
+      await page.waitForTimeout(500);
+      
+      // Lấy tất cả buttons
+      const buttons = await page.$$('button, input[type="submit"], [role="button"], .btn, .btn-submit');
+      console.log(`📋 Tìm thấy ${buttons.length} buttons trên trang`);
+      
+      if (buttons.length === 0) {
+        throw new Error('Không tìm thấy button nào trên trang!');
+      }
+      
+      // Loop qua từng button và tìm button có text phù hợp
+      for (const btn of buttons) {
+        try {
+          const text = await page.evaluate(el => (el.textContent || el.value || '').trim(), btn);
+          console.log(`   - Button: "${text}"`);
+          
+          if (text.toLowerCase().includes(submitButtonText.toLowerCase())) {
+            console.log(`🔘 Tìm thấy nút: "${text}"`);
+            
+            // Scroll vào view
+            await page.evaluate(el => el.scrollIntoView({ behavior: 'smooth', block: 'center' }), btn);
+            await page.waitForTimeout(500);
+            
+            // Click
+            await btn.click();
+            console.log('✅ Đã click nút Submit!');
+            clickSuccess = true;
+            break;
+          }
+        } catch (btnErr) {
+          console.log(`   ⚠️ Lỗi khi đọc button: ${btnErr.message}`);
+          continue;
+        }
+      }
+      
+      // Fallback: click button đầu tiên nếu không tìm thấy text match
+      if (!clickSuccess && buttons.length > 0) {
+        console.log('⚠️ Không tìm thấy text match, click button đầu tiên...');
+        await buttons[0].click();
+        console.log('✅ Đã click button đầu tiên!');
         clickSuccess = true;
       }
+    } catch (err) {
+      console.error('❌ Lỗi khi tìm nút:', err.message);
     }
 
     if (!clickSuccess) {
@@ -297,8 +359,14 @@ async function runAutomation(url, searchKeyword, options = {}) {
 
     console.log('✨ Hoàn thành! Đã click vào kết quả.');
     
-    // Giữ browser mở để user xem
-    console.log('🎬 Browser sẽ được giữ mở. Bạn có thể đóng bằng tay khi hoàn tất.');
+    // Thông báo tùy theo loại browser
+    if (shouldCloseBrowser) {
+      console.log('🎬 Browser mới sẽ được giữ mở. Bạn có thể đóng bằng tay khi hoàn tất.');
+    } else {
+      console.log('✅ Tab automation hoàn thành! Browser đang chạy vẫn mở.');
+      console.log('💡 Tip: Bạn có thể đóng tab này nếu muốn.');
+    }
+
 
   } catch (error) {
     console.error('❌ Lỗi automation:', error.message);

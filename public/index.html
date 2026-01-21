@@ -105,52 +105,37 @@
                     <!-- Advanced Options Panel (Hidden by default) -->
                     <div id="advancedOptions" class="advanced-options hidden">
                         <div class="advanced-header">
-                            <h3>⚡ Tùy Chọn Nâng Cao - Tối Ưu Tốc Độ</h3>
-                            <p>Cung cấp các selector cụ thể để tăng tốc độ automation</p>
+                            <h3>⚡ Tùy Chọn Nâng Cao</h3>
+                            <p>Cung cấp selector và text để tăng tốc độ</p>
                         </div>
 
                         <div class="form-group">
                             <label for="searchSelector">
                                 <span class="label-icon">🔍</span>
-                                CSS Selector cho Ô Tìm Kiếm (Tùy chọn)
+                                CSS Selector cho Ô Tìm Kiếm
                             </label>
                             <input 
                                 type="text" 
                                 id="searchSelector" 
                                 name="searchSelector" 
-                                placeholder="VD: input[name='search'], #search-box"
+                                placeholder="VD: input[placeholder='Search by name']"
                             >
-                            <small>Nếu cung cấp, tool sẽ BỎ QUA việc dò tìm và dùng selector này TRỰC TIẾP (nhanh hơn nhiều)</small>
+                            <small>Selector của ô search trên trang (để trống = tự động tìm)</small>
                         </div>
 
                         <div class="form-group">
-                            <label for="resultSelector">
-                                <span class="label-icon">🎯</span>
-                                CSS Selector cho Kết Quả Tìm Kiếm (Tùy chọn)
+                            <label for="submitButtonText">
+                                <span class="label-icon">🔘</span>
+                                Text của Nút Cần Click
                             </label>
                             <input 
                                 type="text" 
-                                id="resultSelector" 
-                                name="resultSelector" 
-                                placeholder="VD: .search-result a, a[href*='watch']"
+                                id="submitButtonText" 
+                                name="submitButtonText" 
+                                placeholder="VD: Submit, OK, Confirm"
+                                value="Submit"
                             >
-                            <small>Selector cho kết quả search. Nếu cung cấp, tool sẽ BỎ QUA việc dò tìm</small>
-                        </div>
-
-                        <div class="form-group">
-                            <label for="resultIndex">
-                                <span class="label-icon">🔢</span>
-                                Vị Trí Kết Quả Muốn Click
-                            </label>
-                            <input 
-                                type="number" 
-                                id="resultIndex" 
-                                name="resultIndex" 
-                                min="0"
-                                value="0"
-                                placeholder="0"
-                            >
-                            <small>0 = kết quả đầu tiên, 1 = kết quả thứ 2, ...</small>
+                            <small>Tool sẽ tìm nút có chứa text này và click vào</small>
                         </div>
 
                         <div class="form-group">
@@ -159,15 +144,18 @@
                                     type="checkbox" 
                                     id="skipRefresh" 
                                     name="skipRefresh"
+                                    checked
                                 >
                                 <span class="checkbox-text">
                                     <span class="label-icon">⚡</span>
-                                    Bỏ qua bước Refresh trang (Tăng tốc ~2-3 giây)
+                                    Bỏ qua bước Refresh trang (Nhanh hơn)
                                 </span>
                             </label>
-                            <small>⚠️ Chỉ nên bật nếu trang web không cần refresh</small>
+                            <small>Khuyến nghị: BẬT để tăng tốc độ</small>
                         </div>
                     </div>
+
+
 
             <!-- Action Buttons -->
             <div class="button-group">

@@ -1,7 +1,7 @@
 {
   "name": "maple-auto-search-tool",
-  "version": "2.0.0",
-  "description": "Công cụ tự động search và click - Tối ưu hóa 50-70% tốc độ ⚡",
+  "version": "2.1.0",
+  "description": "Công cụ tự động search và click - Dùng browser đang mở ⚡",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",

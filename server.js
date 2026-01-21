@@ -15,7 +15,7 @@ const scheduledTasks = new Map();
 // API endpoint to schedule automation
 app.post("/api/schedule", async (req, res) => {
   try {
-    const { url, targetTime, searchKeyword, taskId, searchSelector, resultSelector, resultIndex, skipRefresh } = req.body;
+    const { url, targetTime, searchKeyword, taskId, searchSelector, submitButtonText, skipRefresh } = req.body;
 
     if (!url || !targetTime || !searchKeyword) {
       return res.status(400).json({
@@ -47,8 +47,7 @@ app.post("/api/schedule", async (req, res) => {
       await runAutomation(url, searchKeyword, { 
         useOpera: req.body.useOpera !== false,
         searchSelector,
-        resultSelector,
-        resultIndex,
+        submitButtonText,
         skipRefresh
       });
       scheduledTasks.delete(taskId);
@@ -82,7 +81,7 @@ app.post("/api/schedule", async (req, res) => {
 // API endpoint to run immediately
 app.post("/api/run-now", async (req, res) => {
   try {
-    const { url, searchKeyword, searchSelector, resultSelector, resultIndex, skipRefresh } = req.body;
+    const { url, searchKeyword, searchSelector, submitButtonText, skipRefresh } = req.body;
 
     if (!url || !searchKeyword) {
       return res.status(400).json({
@@ -100,8 +99,7 @@ app.post("/api/run-now", async (req, res) => {
     runAutomation(url, searchKeyword, {
       useOpera: req.body.useOpera !== false,
       searchSelector,
-      resultSelector,
-      resultIndex,
+      submitButtonText,
       skipRefresh
     }).catch(err => {
       console.error('Automation error:', err);

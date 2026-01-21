@@ -134,15 +134,13 @@ form.addEventListener('submit', async (e) => {
     };
 
     // Add advanced options if provided
-    const searchSelector = document.getElementById('searchSelector').value.trim();
-    const resultSelector = document.getElementById('resultSelector').value.trim();
-    const resultIndex = parseInt(document.getElementById('resultIndex').value) || 0;
-    const skipRefresh = document.getElementById('skipRefresh').checked;
+    const searchSelector = document.getElementById('searchSelector')?.value?.trim() || '';
+    const submitButtonText = document.getElementById('submitButtonText')?.value?.trim() || 'Submit';
+    const skipRefresh = document.getElementById('skipRefresh')?.checked || false;
 
     if (searchSelector) data.searchSelector = searchSelector;
-    if (resultSelector) data.resultSelector = resultSelector;
-    if (resultIndex > 0) data.resultIndex = resultIndex;
-    if (skipRefresh) data.skipRefresh = skipRefresh;
+    if (submitButtonText) data.submitButtonText = submitButtonText;
+    data.skipRefresh = skipRefresh;
 
     try {
         const response = await fetch('/api/schedule', {
@@ -181,15 +179,13 @@ runNowBtn.addEventListener('click', async () => {
     };
 
     // Add advanced options if provided
-    const searchSelector = document.getElementById('searchSelector').value.trim();
-    const resultSelector = document.getElementById('resultSelector').value.trim();
-    const resultIndex = parseInt(document.getElementById('resultIndex').value) || 0;
-    const skipRefresh = document.getElementById('skipRefresh').checked;
+    const searchSelector = document.getElementById('searchSelector')?.value?.trim() || '';
+    const submitButtonText = document.getElementById('submitButtonText')?.value?.trim() || 'Submit';
+    const skipRefresh = document.getElementById('skipRefresh')?.checked || false;
 
     if (searchSelector) data.searchSelector = searchSelector;
-    if (resultSelector) data.resultSelector = resultSelector;
-    if (resultIndex > 0) data.resultIndex = resultIndex;
-    if (skipRefresh) data.skipRefresh = skipRefresh;
+    if (submitButtonText) data.submitButtonText = submitButtonText;
+    data.skipRefresh = skipRefresh;
 
     // Validate
     if (!data.url || !data.searchKeyword) {
