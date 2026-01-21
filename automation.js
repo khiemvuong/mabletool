@@ -38,12 +38,22 @@ function findChromePath() {
 function findOperaPath() {
   // Các đường dẫn phổ biến của Opera trên Windows
   const commonPaths = [
+    // Đường dẫn CHÍNH XÁC của user (ưu tiên đầu tiên!)
+    'C:\\Users\\My PC\\AppData\\Local\\Programs\\Opera\\opera.exe',
+    
+    // Các đường dẫn phổ biến khác với opera.exe
+    process.env.LOCALAPPDATA + '\\Programs\\Opera\\opera.exe',
+    'C:\\Program Files\\Opera\\opera.exe',
+    'C:\\Program Files (x86)\\Opera\\opera.exe',
+    
+    // Thử với launcher.exe (một số phiên bản Opera dùng launcher)
+    process.env.LOCALAPPDATA + '\\Programs\\Opera\\launcher.exe',
     'C:\\Program Files\\Opera\\launcher.exe',
     'C:\\Program Files (x86)\\Opera\\launcher.exe',
-    process.env.LOCALAPPDATA + '\\Programs\\Opera\\launcher.exe',
-    // Thêm đường dẫn chính xác của bạn
-    'C:\\Users\\My PC\\AppData\\Local\\Programs\\Opera\\launcher.exe',
+    
     // Opera GX
+    process.env.LOCALAPPDATA + '\\Programs\\Opera GX\\opera.exe',
+    'C:\\Program Files\\Opera GX\\opera.exe',
     process.env.LOCALAPPDATA + '\\Programs\\Opera GX\\launcher.exe',
     'C:\\Program Files\\Opera GX\\launcher.exe',
   ];
