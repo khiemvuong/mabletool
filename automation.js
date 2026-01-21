@@ -401,64 +401,131 @@ async function runAutomation(url, searchKeyword, options = {}) {
     console.log(`✅ Tìm thấy: ${usedSelector}`);
 
     // ═══════════════════════════════════════════════════════════════
-    // BƯỚC 4: NHẬP KEYWORD VÀ SUBMIT
+    // BƯỚC 4: LẶP LIÊN TỤC: NHẬP → ENTER → KIỂM TRA KẾT QUẢ
+    // Timeout sau 30s nếu không tìm thấy
     // ═══════════════════════════════════════════════════════════════
     console.log('');
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-    console.log('📍 BƯỚC 4: Nhập Keyword và Submit');
+    console.log('📍 BƯỚC 4: Search và Tìm Kết Quả (Loop)');
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     
-    // Focus và clear
-    await searchBox.click();
-    await page.waitForTimeout(CONFIG.ACTION_DELAY);
-    
-    // Nhập siêu nhanh bằng JavaScript
-    await page.evaluate((el, keyword) => {
-      el.value = '';
-      el.value = keyword;
-      el.dispatchEvent(new Event('input', { bubbles: true }));
-      el.dispatchEvent(new Event('change', { bubbles: true }));
-    }, searchBox, searchKeyword);
-    
-    console.log(`⚡ Đã nhập: "${searchKeyword}"`);
-    
-    // Đợi một chút trước khi Enter (quan trọng - một số trang cần thời gian xử lý input)
-    await page.waitForTimeout(500);
-    
-    // Luôn dùng Enter để search
-    console.log('⏎ Nhấn Enter để search...');
-    await searchBox.press('Enter');
-    
-    console.log('✅ Đã submit search');
-
-    // ═══════════════════════════════════════════════════════════════
-    // BƯỚC 5: ĐỢI KẾT QUẢ XUẤT HIỆN
-    // ═══════════════════════════════════════════════════════════════
-    console.log('');
-    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-    console.log('📍 BƯỚC 5: Đợi Kết Quả');
-    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-    
-    // Đợi một chút cho search bắt đầu xử lý
-    await page.waitForTimeout(500);
-    
-    // Đợi kết quả xuất hiện
-    const resultCheck = await waitForResult(page, searchKeyword, submitButtonText);
-    
-    if (!resultCheck.found) {
-      console.log('⚠️ Timeout đợi kết quả, nhưng sẽ thử click anyway...');
-    }
-
-    // ═══════════════════════════════════════════════════════════════
-    // BƯỚC 6: CLICK VÀO KẾT QUẢ PHÙ HỢP
-    // ═══════════════════════════════════════════════════════════════
-    console.log('');
-    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-    console.log('📍 BƯỚC 6: Click Kết Quả');
-    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    const SEARCH_TIMEOUT = 30000; // 30 giây
+    const startTime = Date.now();
+    let resultFound = false;
+    let attemptCount = 0;
     
     const keywordLower = searchKeyword.toLowerCase();
     const submitTextLower = submitButtonText.toLowerCase();
+    
+    // Hàm kiểm tra nhanh xem có kết quả chưa
+    async function checkForResult() {
+      try {
+        return await page.evaluate((kw, st) => {
+          // Tìm card chứa keyword với button
+          const cardSelectors = [
+            '.card', '.item', '.result', '.product', 
+            '[data-name]', '[class*="card"]', '[class*="item"]',
+            'article', '.entry', '.post', '.listing'
+          ];
+          
+          for (const sel of cardSelectors) {
+            try {
+              const cards = document.querySelectorAll(sel);
+              for (const card of cards) {
+                const text = (card.textContent || '').toLowerCase();
+                const dataName = (card.dataset?.name || '').toLowerCase();
+                
+                if (text.includes(kw) || dataName.includes(kw)) {
+                  const btn = card.querySelector('button, .btn, [role="button"], input[type="submit"]');
+                  if (btn && btn.offsetParent !== null) {
+                    return { found: true, type: 'card-button' };
+                  }
+                }
+              }
+            } catch(e) {}
+          }
+          
+          // Tìm button có text match submitButtonText
+          const buttons = document.querySelectorAll('button, .btn, .btn-submit, [role="button"]');
+          for (const btn of buttons) {
+            const btnText = (btn.textContent || btn.value || '').toLowerCase().trim();
+            if (btnText.includes(st) && btn.offsetParent !== null) {
+              return { found: true, type: 'submit-button' };
+            }
+          }
+          
+          return { found: false };
+        }, kw, st);
+      } catch (err) {
+        return { found: false };
+      }
+    }
+    
+    // Vòng lặp chính: Nhập → Enter → Kiểm tra
+    while (!resultFound && (Date.now() - startTime) < SEARCH_TIMEOUT) {
+      attemptCount++;
+      const elapsed = Math.round((Date.now() - startTime) / 1000);
+      console.log(`🔄 Lần ${attemptCount} (${elapsed}s)...`);
+      
+      // 1. Focus vào search box
+      try {
+        await searchBox.click();
+      } catch (e) {
+        // Thử tìm lại search box nếu bị stale
+        const { element: newSearchBox } = await waitForAnySelector(page, searchSelectors, 2000);
+        if (newSearchBox) {
+          searchBox = newSearchBox;
+          await searchBox.click();
+        }
+      }
+      
+      await page.waitForTimeout(100);
+      
+      // 2. Nhập keyword (siêu nhanh bằng JavaScript)
+      await page.evaluate((el, keyword) => {
+        el.value = '';
+        el.value = keyword;
+        el.dispatchEvent(new Event('input', { bubbles: true }));
+        el.dispatchEvent(new Event('change', { bubbles: true }));
+      }, searchBox, searchKeyword);
+      
+      console.log(`   ⚡ Nhập: "${searchKeyword}"`);
+      
+      // 3. Đợi một chút rồi Enter
+      await page.waitForTimeout(300);
+      await searchBox.press('Enter');
+      console.log(`   ⏎ Enter`);
+      
+      // 4. Đợi một chút cho trang xử lý
+      await page.waitForTimeout(500);
+      
+      // 5. Kiểm tra xem có kết quả chưa
+      const check = await checkForResult();
+      if (check.found) {
+        console.log(`   ✅ Tìm thấy kết quả! (${check.type})`);
+        resultFound = true;
+        break;
+      }
+      
+      console.log(`   ⏳ Chưa thấy kết quả, thử lại...`);
+      
+      // Đợi trước khi retry
+      await page.waitForTimeout(500);
+    }
+    
+    if (!resultFound) {
+      console.log(`⚠️ Timeout ${SEARCH_TIMEOUT/1000}s - sẽ thử click anyway...`);
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // BƯỚC 5: CLICK VÀO KẾT QUẢ PHÙ HỢP
+    // ═══════════════════════════════════════════════════════════════
+    console.log('');
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    console.log('📍 BƯỚC 5: Click Kết Quả');
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    
+    // Sử dụng keywordLower và submitTextLower đã khai báo ở trên
     
     // Thực hiện click
     const clickResult = await page.evaluate((kw, st) => {
