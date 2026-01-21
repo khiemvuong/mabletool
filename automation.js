@@ -421,45 +421,13 @@ async function runAutomation(url, searchKeyword, options = {}) {
     }, searchBox, searchKeyword);
     
     console.log(`⚡ Đã nhập: "${searchKeyword}"`);
-    await page.waitForTimeout(CONFIG.ACTION_DELAY);
     
-    // Submit: Thử tìm nút submit trong form/container trước, nếu không thì Enter
-    let submitted = false;
+    // Đợi một chút trước khi Enter (quan trọng - một số trang cần thời gian xử lý input)
+    await page.waitForTimeout(500);
     
-    try {
-      submitted = await page.evaluate((searchEl) => {
-        // Tìm form chứa input
-        const form = searchEl.closest('form');
-        if (form) {
-          const submitBtn = form.querySelector('button[type="submit"], input[type="submit"]');
-          if (submitBtn) {
-            submitBtn.click();
-            return true;
-          }
-        }
-        
-        // Tìm nút search trong container
-        const wrapper = searchEl.closest('[class*="search"]');
-        if (wrapper) {
-          const btn = wrapper.querySelector('button, [role="button"]');
-          if (btn) {
-            btn.click();
-            return true;
-          }
-        }
-        
-        return false;
-      }, searchBox);
-    } catch (err) {
-      submitted = false;
-    }
-    
-    if (!submitted) {
-      console.log('⏎ Nhấn Enter để submit...');
-      await searchBox.press('Enter');
-    } else {
-      console.log('🔘 Đã click nút submit');
-    }
+    // Luôn dùng Enter để search
+    console.log('⏎ Nhấn Enter để search...');
+    await searchBox.press('Enter');
     
     console.log('✅ Đã submit search');
 
