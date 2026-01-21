@@ -455,7 +455,7 @@ async function runAutomation(url, searchKeyword, options = {}) {
           }
           
           return { found: false };
-        }, kw, st);
+        }, keywordLower, submitTextLower);
       } catch (err) {
         return { found: false };
       }
