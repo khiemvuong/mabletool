@@ -276,35 +276,45 @@ async function runAutomation(url, searchKeyword, options = {}) {
         'input[type="text"]' // Fallback
       ];
 
-    for (const selector of searchSelectors) {
-      try {
-        const searchBox = await page.$(selector);
-        if (searchBox) {
-          console.log(`✅ Tìm thấy search box: ${selector}`);
-          
-          // Click vào search box
-          await searchBox.click();
-          await page.waitForTimeout(200); // Giảm xuống 200ms
-          
-          // ⚡ TỐI ƯU: Dùng JavaScript để set value trực tiếp thay vì type()
-          // Nhanh hơn NHIỀU so với việc gõ từng ký tự
-          await page.evaluate((el, keyword) => {
-            el.value = keyword;
-            // Trigger input event để website nhận biết thay đổi
-            el.dispatchEvent(new Event('input', { bubbles: true }));
-            el.dispatchEvent(new Event('change', { bubbles: true }));
-          }, searchBox, searchKeyword);
-          
-          console.log('⚡ Đã nhập từ khóa (JavaScript injection - siêu nhanh!)');
-          await page.waitForTimeout(300);
-          
-          // Nhấn Enter
-          await searchBox.press('Enter');
-          searchSuccess = true;
-          break;
+    // Retry logic: Thử tìm search box nhiều lần
+    const maxRetries = 20;
+    const retryDelay = 1000; // 1s giữa mỗi lần retry
+    
+    for (let attempt = 1; attempt <= maxRetries && !searchSuccess; attempt++) {
+      if (attempt > 1) {
+        console.log(`🔄 Retry lần ${attempt}/${maxRetries} - đợi page load...`);
+        await page.waitForTimeout(retryDelay);
+      }
+      
+      for (const selector of searchSelectors) {
+        try {
+          const searchBox = await page.$(selector);
+          if (searchBox) {
+            console.log(`✅ Tìm thấy search box: ${selector}`);
+            
+            // Click vào search box
+            await searchBox.click();
+            await page.waitForTimeout(200);
+            
+            // ⚡ TỐI ƯU: Dùng JavaScript để set value trực tiếp thay vì type()
+            await page.evaluate((el, keyword) => {
+              el.value = keyword;
+              // Trigger input event để website nhận biết thay đổi
+              el.dispatchEvent(new Event('input', { bubbles: true }));
+              el.dispatchEvent(new Event('change', { bubbles: true }));
+            }, searchBox, searchKeyword);
+            
+            console.log('⚡ Đã nhập từ khóa (JavaScript injection - siêu nhanh!)');
+            await page.waitForTimeout(300);
+            
+            // Nhấn Enter
+            await searchBox.press('Enter');
+            searchSuccess = true;
+            break;
+          }
+        } catch (err) {
+          continue;
         }
-      } catch (err) {
-        continue;
       }
     }
 
@@ -322,60 +332,79 @@ async function runAutomation(url, searchKeyword, options = {}) {
     
     let clickSuccess = false;
     
-    try {
-      // Đợi button xuất hiện trước
+    // Retry logic: Thử tìm submit button nhiều lần
+    const maxButtonRetries = 3;
+    const buttonRetryDelay = 1000; // 1s giữa mỗi lần retry
+    
+    for (let attempt = 1; attempt <= maxButtonRetries && !clickSuccess; attempt++) {
+      if (attempt > 1) {
+        console.log(`🔄 Retry tìm nút lần ${attempt}/${maxButtonRetries}...`);
+        await page.waitForTimeout(buttonRetryDelay);
+      }
+      
       try {
-        await page.waitForSelector('button', { timeout: 5000 });
-        console.log('✅ Đã thấy button trên trang');
-      } catch (e) {
-        console.log('⚠️ Timeout đợi button, nhưng sẽ thử tiếp...');
-      }
-      
-      // Đợi thêm một chút để page ổn định
-      await page.waitForTimeout(500);
-      
-      // Lấy tất cả buttons
-      const buttons = await page.$$('button, input[type="submit"], [role="button"], .btn, .btn-submit');
-      console.log(`📋 Tìm thấy ${buttons.length} buttons trên trang`);
-      
-      if (buttons.length === 0) {
-        throw new Error('Không tìm thấy button nào trên trang!');
-      }
-      
-      // Loop qua từng button và tìm button có text phù hợp
-      for (const btn of buttons) {
+        // Đợi button xuất hiện trước
         try {
-          const text = await page.evaluate(el => (el.textContent || el.value || '').trim(), btn);
-          console.log(`   - Button: "${text}"`);
-          
-          if (text.toLowerCase().includes(submitButtonText.toLowerCase())) {
-            console.log(`🔘 Tìm thấy nút: "${text}"`);
-            
-            // Scroll vào view
-            await page.evaluate(el => el.scrollIntoView({ behavior: 'smooth', block: 'center' }), btn);
-            await page.waitForTimeout(500);
-            
-            // Click
-            await btn.click();
-            console.log('✅ Đã click nút Submit!');
-            clickSuccess = true;
-            break;
+          await page.waitForSelector('button', { timeout: 5000 });
+          console.log('✅ Đã thấy button trên trang');
+        } catch (e) {
+          console.log('⚠️ Timeout đợi button, nhưng sẽ thử tiếp...');
+        }
+        
+        // Đợi thêm một chút để page ổn định
+        await page.waitForTimeout(500);
+        
+        // Lấy tất cả buttons
+        const buttons = await page.$$('button, input[type="submit"], [role="button"], .btn, .btn-submit');
+        console.log(`📋 Tìm thấy ${buttons.length} buttons trên trang`);
+        
+        if (buttons.length === 0) {
+          if (attempt < maxButtonRetries) {
+            console.log('⚠️ Chưa thấy button, sẽ retry...');
+            continue;
+          } else {
+            throw new Error('Không tìm thấy button nào trên trang!');
           }
-        } catch (btnErr) {
-          console.log(`   ⚠️ Lỗi khi đọc button: ${btnErr.message}`);
-          continue;
+        }
+        
+        // Loop qua từng button và tìm button có text phù hợp
+        for (const btn of buttons) {
+          try {
+            const text = await page.evaluate(el => (el.textContent || el.value || '').trim(), btn);
+            console.log(`   - Button: "${text}"`);
+            
+            if (text.toLowerCase().includes(submitButtonText.toLowerCase())) {
+              console.log(`🔘 Tìm thấy nút: "${text}"`);
+              
+              // Scroll vào view
+              await page.evaluate(el => el.scrollIntoView({ behavior: 'smooth', block: 'center' }), btn);
+              await page.waitForTimeout(500);
+              
+              // Click
+              await btn.click();
+              console.log('✅ Đã click nút Submit!');
+              clickSuccess = true;
+              break;
+            }
+          } catch (btnErr) {
+            console.log(`   ⚠️ Lỗi khi đọc button: ${btnErr.message}`);
+            continue;
+          }
+        }
+        
+        // Fallback: click button đầu tiên nếu không tìm thấy text match
+        if (!clickSuccess && buttons.length > 0 && attempt === maxButtonRetries) {
+          console.log('⚠️ Không tìm thấy text match, click button đầu tiên...');
+          await buttons[0].click();
+          console.log('✅ Đã click button đầu tiên!');
+          clickSuccess = true;
+        }
+      } catch (err) {
+        console.error(`❌ Lỗi khi tìm nút (attempt ${attempt}):`, err.message);
+        if (attempt === maxButtonRetries) {
+          throw err;
         }
       }
-      
-      // Fallback: click button đầu tiên nếu không tìm thấy text match
-      if (!clickSuccess && buttons.length > 0) {
-        console.log('⚠️ Không tìm thấy text match, click button đầu tiên...');
-        await buttons[0].click();
-        console.log('✅ Đã click button đầu tiên!');
-        clickSuccess = true;
-      }
-    } catch (err) {
-      console.error('❌ Lỗi khi tìm nút:', err.message);
     }
 
     if (!clickSuccess) {
