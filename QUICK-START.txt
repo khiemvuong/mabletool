@@ -1,0 +1,72 @@
+╔═══════════════════════════════════════════════════╗
+║   🍁 MAPLE AUTO SEARCH TOOL - QUICK START 🍁     ║
+╚═══════════════════════════════════════════════════╝
+
+📋 HƯỚNG DẪN NHANH CHO MÁY KHÔNG CÓ MÔI TRƯỜNG LẬP TRÌNH:
+
+═══════════════════════════════════════════════════════
+
+🎯 CÁCH 1: SỬ DỤNG FILE EXECUTABLE (KHUYÊN DÙNG)
+═══════════════════════════════════════════════════════
+
+1️⃣ Trên máy có Node.js:
+   - Chạy file: build-portable.bat
+   - Đợi build xong
+
+2️⃣ Copy thư mục "dist" sang máy đích:
+   - Copy toàn bộ folder "dist"
+   - Paste vào bất kỳ đâu trên máy đích
+
+3️⃣ Trên máy đích (KHÔNG CẦN CÀI GÌ):
+   - Double-click: MapleAutoSearch.exe
+   - Mở trình duyệt: http://localhost:3000
+   - Sử dụng ngay! ✅
+
+═══════════════════════════════════════════════════════
+
+🎯 CÁCH 2: CÀI NODE.JS (ĐƠN GIẢN)
+═══════════════════════════════════════════════════════
+
+1️⃣ Tải Node.js:
+   → https://nodejs.org
+   → Chọn "LTS" version
+   → Cài đặt bình thường
+
+2️⃣ Copy toàn bộ project sang máy đích
+
+3️⃣ Mở Command Prompt tại folder project:
+   → Click phải vào folder
+   → Chọn "Open in Terminal"
+   
+4️⃣ Chạy lệnh:
+   npm install
+   npm start
+
+5️⃣ Mở browser: http://localhost:3000
+
+═══════════════════════════════════════════════════════
+
+⚠️ LƯU Ý QUAN TRỌNG:
+═══════════════════════════════════════════════════════
+
+✅ Cần cài OPERA BROWSER nếu muốn dùng VPN
+   → https://www.opera.com/download
+
+✅ Windows Defender có thể cảnh báo file .exe
+   → Chọn "More info" → "Run anyway"
+
+✅ Nếu port 3000 bị chiếm:
+   → Sửa file server.js, dòng: const PORT = 3000
+   → Đổi thành 3001, 3002, etc.
+
+═══════════════════════════════════════════════════════
+
+📞 HỖ TRỢ:
+═══════════════════════════════════════════════════════
+
+Đọc chi tiết: DEPLOY.md
+Hướng dẫn sử dụng: README.md
+
+═══════════════════════════════════════════════════════
+
+Made with ❤️ by Maple Team | v1.0.0

@@ -1,0 +1,179 @@
+═══════════════════════════════════════════════════════════════
+  ✅ CHECKLIST CHUYỂN MÁY MỚI - MAPLE TOOL
+═══════════════════════════════════════════════════════════════
+
+📋 In trang này ra và check từng mục khi làm!
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+PHẦN 1: CHUẨN BỊ TRÊN MÁY CŨ
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+□ Đã test tool chạy OK trên máy hiện tại
+
+□ CÁCH 1 (Tự động):
+   □ Đã chạy file: dong-goi-cho-may-moi.bat
+   □ Có thư mục: maple-tool-package
+   □ Hoặc có file ZIP: maple-tool-for-new-pc.zip
+
+□ CÁCH 2 (Thủ công):
+   □ Đã copy thư mục "maple-tool" 
+   □ ⚠️ Bỏ qua thư mục "node_modules" (nặng, không cần)
+   □ ⚠️ Bỏ qua thư mục "dist" (nếu có)
+
+□ Đã kiểm tra files QUAN TRỌNG có trong package:
+   □ server.js
+   □ automation.js
+   □ package.json
+   □ package-lock.json
+   □ thư mục public/ (3 files: html, js, css)
+   □ start.bat
+   □ setup-browser.bat
+   □ CHO-MAY-MOI.txt
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+PHẦN 2: CHUYỂN FILES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Chọn 1 trong các cách sau:
+
+□ USB Drive
+   □ Copy thư mục/ZIP vào USB
+   □ Mang sang máy mới
+   □ Copy vào ổ cứng máy mới
+
+□ Cloud (Google Drive, OneDrive, Dropbox...)
+   □ Upload thư mục/ZIP lên cloud
+   □ Download về máy mới
+
+□ Network Share
+   □ Copy qua mạng LAN
+   
+□ Email (nếu file nhỏ)
+   □ Nén và gửi qua email
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+PHẦN 3: SETUP TRÊN MÁY MỚI
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+A. Cài đặt Node.js
+□ Truy cập: https://nodejs.org/
+□ Tải phiên bản LTS (khuyến nghị)
+□ Chạy file cài đặt
+□ Next, next, finish...
+□ Khởi động lại Command Prompt/PowerShell
+□ Kiểm tra: mở CMD/PowerShell, gõ: node -v
+   (phải hiện version number, VD: v18.16.0)
+
+
+B. Giải nén files
+□ Giải nén ZIP (nếu dùng ZIP)
+   Hoặc
+□ Mở thư mục maple-tool-package
+   Hoặc  
+□ Mở thư mục maple-tool (nếu copy trực tiếp)
+
+
+C. Cài đặt Dependencies
+□ Mở Command Prompt/PowerShell
+   (Mẹo: Vào thư mục -> Gõ "cmd" lên thanh địa chỉ -> Enter)
+□ Di chuyển vào thư mục maple-tool (nếu chưa đúng chỗ):
+   cd D:\đường\dẫn\đến\maple-tool
+□ Chạy lệnh: npm install
+□ Đợi cài đặt xong (có thể mất 1-2 phút)
+□ Kiểm tra thư mục "node_modules" đã xuất hiện
+
+
+D. Setup Browser
+□ Kiểm tra máy có Chrome/Edge/Opera chưa?
+   
+   Nếu CHƯA:
+   □ CÁCH 1: Double-click "setup-browser.bat"
+      Hoặc
+   □ CÁCH 2: Chạy lệnh: npm run setup
+      Hoặc
+   □ CÁCH 3: Cài thủ công:
+      □ Chrome: https://www.google.com/chrome/
+      □ Opera: https://www.opera.com/
+      
+   Nếu ĐÃ CÓ:
+   □ Tool sẽ tự động phát hiện, bỏ qua bước này
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+PHẦN 4: CHẠY THỬ
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+□ Double-click "start.bat"
+   Hoặc chạy lệnh: npm start
+
+□ Thấy thông báo:
+   "✅ Server đang chạy tại: http://localhost:3000"
+
+□ Mở browser (Chrome/Edge/Opera bất kỳ)
+
+□ Truy cập: http://localhost:3000
+
+□ Thấy giao diện Maple Tool với:
+   □ Logo 🍁 Maple Auto Search Tool
+   □ Form nhập URL, Time, Keyword
+   □ Nút "Hẹn Giờ Chạy" và "Chạy Ngay"
+   □ Phần "Tasks Đã Hẹn"
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+PHẦN 5: TEST CHỨC NĂNG
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+□ Nhập URL test: https://www.youtube.com
+□ Nhập keyword test: "maple syrup"
+□ Click "Chạy Ngay"
+□ Browser mới tự động mở
+□ Trang YouTube load
+□ Tự động search "maple syrup"
+□ Thành công! ✅
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+❌ TROUBLESHOOTING
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Lỗi gặp phải                    Giải pháp
+─────────────────────────────────────────────────────────────
+
+□ "npm không được nhận..."    → Cài Node.js, restart CMD
+□ "Could not find Chrome"     → Chạy setup-browser.bat
+□ "Port 3000 đang dùng"       → Đóng app khác dùng port 3000
+□ "Cannot find module..."     → Chạy lại: npm install
+□ Localhost không mở được     → Check server có chạy không
+□ Browser không mở            → Check terminal có lỗi gì
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+✅ HOÀN TẤT!
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+□ Tool đã chạy thành công trên máy mới
+□ Đã test automation hoạt động OK
+□ Đã lưu checklist này để sau dùng lại
+
+Chúc mừng! 🎉
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📝 GHI CHÚ
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Thời gian setup: ___________________
+
+Vấn đề gặp phải (nếu có):
+
+
+Cách đã giải quyết:
+
+
+═══════════════════════════════════════════════════════════════
+Made with ❤️ by Maple Team | v1.1.0
+═══════════════════════════════════════════════════════════════

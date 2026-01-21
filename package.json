@@ -1,0 +1,43 @@
+{
+  "name": "maple-auto-search-tool",
+  "version": "2.0.0",
+  "description": "Công cụ tự động search và click - Tối ưu hóa 50-70% tốc độ ⚡",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js",
+    "setup": "npx puppeteer browsers install chrome",
+    "postinstall": "echo Đa cài đặt dependencies thành công! Nếu gặp lỗi browser, chạy: npm run setup",
+    "build": "pkg . --targets node18-win-x64 --output dist/MapleAutoSearch.exe",
+    "build-all": "pkg . --targets node18-win-x64,node18-linux-x64,node18-macos-x64 --out-path dist"
+  },
+  "bin": "server.js",
+  "pkg": {
+    "assets": [
+      "public/**/*",
+      "node_modules/puppeteer/.local-chromium/**/*"
+    ],
+    "scripts": [
+      "automation.js"
+    ],
+    "targets": [
+      "node18-win-x64"
+    ],
+    "outputPath": "dist"
+  },
+  "keywords": [
+    "automation",
+    "puppeteer",
+    "auto-search"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.18.2",
+    "puppeteer": "^21.6.1",
+    "node-cron": "^3.0.3"
+  },
+  "devDependencies": {
+    "pkg": "^5.8.1"
+  }
+}

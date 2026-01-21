@@ -1,0 +1,170 @@
+═══════════════════════════════════════════════════════════════
+  🍁 HƯỚNG DẪN CHUYỂN SANG MÁY MỚI 🍁
+═══════════════════════════════════════════════════════════════
+
+📦 BƯỚC 1: CHUẨN BỊ FILES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+CÁCH 1: Copy toàn bộ thư mục (Khuyến nghị)
+-------------------------------------------
+✅ Copy toàn bộ thư mục "maple-tool" sang máy mới
+   
+   ⚠️ KHÔNG CẦN copy thư mục "node_modules" (sẽ cài lại)
+   ⚠️ KHÔNG CẦN copy thư mục "dist" (nếu có)
+
+
+CÁCH 2: Copy từng file (nếu cần)
+---------------------------------
+Copy các files SAU ĐÂY sang máy mới:
+
+📄 Files chính (BẮT BUỘC):
+  ✅ server.js
+  ✅ automation.js  
+  ✅ package.json
+  ✅ package-lock.json
+
+📁 Thư mục public (BẮT BUỘC):
+  ✅ public/index.html
+  ✅ public/script.js
+  ✅ public/styles.css
+
+📄 Files setup (KHUYẾN NGHỊ):
+  ✅ start.bat
+  ✅ setup-browser.bat
+  ✅ README.md
+  ✅ SETUP-GUIDE.md
+  ✅ QUICK-GUIDE.txt
+  ✅ CHO-MAY-MOI.txt (file này)
+
+📄 Files tùy chọn:
+  ⭕ CHANGELOG.md
+  ⭕ DEPLOY.md
+  ⭕ build-portable.bat
+  ⭕ .gitignore
+
+
+═══════════════════════════════════════════════════════════════
+
+💻 BƯỚC 2: CÀI ĐẶT TRÊN MÁY MỚI
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+A. Cài đặt Node.js (nếu chưa có)
+--------------------------------
+1. Tải Node.js từ: https://nodejs.org/
+2. Chọn phiên bản LTS (khuyến nghị)
+3. Cài đặt theo hướng dẫn
+4. Khởi động lại Command Prompt/PowerShell
+
+
+B. Cài đặt Tool
+---------------
+Mở Command Prompt trong thư mục maple-tool:
+
+   MẸO NHANH (Nên dùng):
+   1. Vào thư mục maple-tool trong File Explorer
+   2. Click vào thanh địa chỉ ở trên cùng
+   3. Gõ: cmd
+   4. Nhấn Enter
+
+1️⃣ Cài dependencies:
+   npm install
+
+2️⃣ Setup browser (nếu không có Chrome/Edge/Opera):
+   
+   CÁCH 1 (Dễ nhất):
+   Double-click file: setup-browser.bat
+   
+   CÁCH 2 (Command line):
+   npm run setup
+   
+   CÁCH 3 (Thủ công):
+   Cài Google Chrome: https://www.google.com/chrome/
+   HOẶC cài Opera: https://www.opera.com/
+
+3️⃣ Hoàn tất!
+
+
+═══════════════════════════════════════════════════════════════
+
+🚀 BƯỚC 3: CHẠY TOOL
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+CÁCH 1 (Dễ nhất):
+  Double-click file: start.bat
+
+CÁCH 2 (Command line):
+  npm start
+
+Sau đó mở browser và truy cập:
+👉 http://localhost:3000
+
+
+═══════════════════════════════════════════════════════════════
+
+✅ CHECKLIST KIỂM TRA
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Trước khi chuyển máy, check list này:
+
+□ Node.js đã được cài (kiểm tra: node -v)
+□ Đã copy đủ files/thư mục
+□ Đã chạy: npm install
+□ Đã setup browser (nếu cần)
+□ Server chạy được: npm start
+□ Mở được trang: http://localhost:3000
+□ Test thử "Chạy Ngay" để đảm bảo browser mở được
+
+
+═══════════════════════════════════════════════════════════════
+
+❌ XỬ LÝ LỖI THƯỜNG GẶP
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+LỖI: "Could not find Chrome"
+└─ GIẢI PHÁP: Chạy setup-browser.bat HOẶC cài Chrome/Opera
+
+LỖI: "npm không được nhận dạng..."
+└─ GIẢI PHÁP: Cài Node.js và khởi động lại Command Prompt
+
+LỖI: "Port 3000 đang được sử dụng"
+└─ GIẢI PHÁP: Đóng process đang dùng port 3000
+   Hoặc đổi port trong server.js (dòng 6)
+
+LỖI: "Cannot find module..."
+└─ GIẢI PHÁP: Chạy lại: npm install
+
+LỖI: Browser mở nhưng không làm gì
+└─ GIẢI PHÁP: Kiểm tra URL và từ khóa có đúng không
+   Xem terminal để check lỗi chi tiết
+
+
+═══════════════════════════════════════════════════════════════
+
+📞 LIÊN HỆ HỖ TRỢ
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Nếu gặp vấn đề, xem:
+📄 README.md - Hướng dẫn tổng quan
+📄 SETUP-GUIDE.md - Hướng dẫn setup chi tiết
+📄 QUICK-GUIDE.txt - Tra cứu nhanh
+
+
+═══════════════════════════════════════════════════════════════
+
+🎯 TÓM TẮT NHANH
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. Copy toàn bộ thư mục "maple-tool"
+2. Cài Node.js (nếu chưa có)
+3. Mở CMD/PowerShell trong thư mục
+4. Chạy: npm install
+5. Chạy: npm run setup (nếu không có browser)
+6. Chạy: npm start
+7. Mở: http://localhost:3000
+
+XONG! 🎉
+
+
+═══════════════════════════════════════════════════════════════
+Made with ❤️ by Maple Team | v1.1.0
+═══════════════════════════════════════════════════════════════

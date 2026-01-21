@@ -1,0 +1,242 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>🍁 Maple Auto Search Tool</title>
+    <link rel="stylesheet" href="styles.css" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+  </head>
+  <body>
+    <div class="container">
+      <!-- Header -->
+      <header class="header">
+        <div class="logo">
+          <span class="icon">🍁</span>
+          <h1>Maple Auto Search Tool</h1>
+        </div>
+        <p class="subtitle">
+          Công cụ tự động search và click nhanh như chớp ⚡
+        </p>
+      </header>
+
+      <!-- Main Form -->
+      <div class="card">
+        <div class="card-header">
+          <h2>⚙️ Cấu hình Automation</h2>
+        </div>
+        <div class="card-body">
+          <form id="automationForm">
+            <!-- URL Input -->
+            <div class="form-group">
+              <label for="url">
+                <span class="label-icon">🌐</span>
+                URL Trang Web
+              </label>
+              <input
+                type="url"
+                id="url"
+                name="url"
+                placeholder="https://example.com"
+                required
+              />
+              <small>Nhập đầy đủ URL bao gồm https://</small>
+            </div>
+
+            <!-- Time Input -->
+            <div class="form-group">
+              <label for="targetTime">
+                <span class="label-icon">⏰</span>
+                Thời Gian Chạy
+              </label>
+              <input
+                type="time"
+                id="targetTime"
+                name="targetTime"
+                step="1"
+                required
+              />
+              <small>Chọn giờ:phút:giây (VD: 13:00:00)</small>
+            </div>
+
+                    <!-- Search Keyword Input -->
+                    <div class="form-group">
+                        <label for="searchKeyword">
+                            <span class="label-icon">🔍</span>
+                            Từ Khóa Tìm Kiếm
+                        </label>
+                        <input 
+                            type="text" 
+                            id="searchKeyword" 
+                            name="searchKeyword" 
+                            placeholder="Nhập từ khóa..." 
+                            required
+                        >
+                        <small>Từ khóa sẽ được tự động search trên trang web</small>
+                    </div>
+
+                    <!-- Browser Type Selection -->
+                    <div class="form-group">
+                        <label class="checkbox-label">
+                            <input 
+                                type="checkbox" 
+                                id="useOpera" 
+                                name="useOpera" 
+                                checked
+                            >
+                            <span class="checkbox-text">
+                                <span class="label-icon">🎭</span>
+                                Sử dụng Opera Browser (VPN sẽ hoạt động)
+                            </span>
+                        </label>
+                        <small>✅ Opera với VPN | ❌ Chromium mặc định (không VPN)</small>
+                    </div>
+
+                    <!-- Advanced Options Toggle -->
+                    <div class="form-group">
+                        <button type="button" id="toggleAdvanced" class="btn-link">
+                            ⚙️ Tùy Chọn Nâng Cao (Tăng Tốc Độ) <span id="advancedToggleIcon">▼</span>
+                        </button>
+                    </div>
+
+                    <!-- Advanced Options Panel (Hidden by default) -->
+                    <div id="advancedOptions" class="advanced-options hidden">
+                        <div class="advanced-header">
+                            <h3>⚡ Tùy Chọn Nâng Cao - Tối Ưu Tốc Độ</h3>
+                            <p>Cung cấp các selector cụ thể để tăng tốc độ automation</p>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="searchSelector">
+                                <span class="label-icon">🔍</span>
+                                CSS Selector cho Ô Tìm Kiếm (Tùy chọn)
+                            </label>
+                            <input 
+                                type="text" 
+                                id="searchSelector" 
+                                name="searchSelector" 
+                                placeholder="VD: input[name='search'], #search-box"
+                            >
+                            <small>Nếu cung cấp, tool sẽ BỎ QUA việc dò tìm và dùng selector này TRỰC TIẾP (nhanh hơn nhiều)</small>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="resultSelector">
+                                <span class="label-icon">🎯</span>
+                                CSS Selector cho Kết Quả Tìm Kiếm (Tùy chọn)
+                            </label>
+                            <input 
+                                type="text" 
+                                id="resultSelector" 
+                                name="resultSelector" 
+                                placeholder="VD: .search-result a, a[href*='watch']"
+                            >
+                            <small>Selector cho kết quả search. Nếu cung cấp, tool sẽ BỎ QUA việc dò tìm</small>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="resultIndex">
+                                <span class="label-icon">🔢</span>
+                                Vị Trí Kết Quả Muốn Click
+                            </label>
+                            <input 
+                                type="number" 
+                                id="resultIndex" 
+                                name="resultIndex" 
+                                min="0"
+                                value="0"
+                                placeholder="0"
+                            >
+                            <small>0 = kết quả đầu tiên, 1 = kết quả thứ 2, ...</small>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="checkbox-label">
+                                <input 
+                                    type="checkbox" 
+                                    id="skipRefresh" 
+                                    name="skipRefresh"
+                                >
+                                <span class="checkbox-text">
+                                    <span class="label-icon">⚡</span>
+                                    Bỏ qua bước Refresh trang (Tăng tốc ~2-3 giây)
+                                </span>
+                            </label>
+                            <small>⚠️ Chỉ nên bật nếu trang web không cần refresh</small>
+                        </div>
+                    </div>
+
+            <!-- Action Buttons -->
+            <div class="button-group">
+              <button type="submit" class="btn btn-primary">
+                <span class="btn-icon">📅</span>
+                Hẹn Giờ Chạy
+              </button>
+              <button type="button" id="runNowBtn" class="btn btn-secondary">
+                <span class="btn-icon">🚀</span>
+                Chạy Ngay
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <!-- Status Display -->
+      <div class="card status-card hidden" id="statusCard">
+        <div class="card-header">
+          <h2>📊 Trạng Thái</h2>
+        </div>
+        <div class="card-body">
+          <div id="statusMessage" class="status-message"></div>
+        </div>
+      </div>
+
+      <!-- Scheduled Tasks -->
+      <div class="card" id="tasksCard">
+        <div class="card-header">
+          <h2>📋 Tasks Đã Hẹn</h2>
+          <button id="refreshTasksBtn" class="btn-icon-only" title="Refresh">
+            🔄
+          </button>
+        </div>
+        <div class="card-body">
+          <div id="tasksList" class="tasks-list">
+            <p class="empty-state">Chưa có task nào được hẹn giờ</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Info Cards -->
+      <div class="info-grid">
+        <div class="info-card">
+          <div class="info-icon">⚡</div>
+          <h3>Tốc Độ Cao</h3>
+          <p>Tự động F5 và search nhanh chóng</p>
+        </div>
+        <div class="info-card">
+          <div class="info-icon">🎯</div>
+          <h3>Chính Xác</h3>
+          <p>Click vào đúng kết quả đầu tiên</p>
+        </div>
+        <div class="info-card">
+          <div class="info-icon">🔄</div>
+          <h3>Retry Thông Minh</h3>
+          <p>Tự động retry khi trang load chậm</p>
+        </div>
+      </div>
+
+      <!-- Footer -->
+      <footer class="footer">
+        <p>Made with ❤️ by Maple Team | v1.0.0</p>
+      </footer>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="toast hidden"></div>
+
+    <script src="script.js"></script>
+  </body>
+</html>
