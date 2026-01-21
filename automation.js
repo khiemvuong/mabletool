@@ -221,17 +221,19 @@ async function runAutomation(url, searchKeyword, options = {}) {
     }
 
 
+
     // Tối ưu hóa: Chặn các resource không cần thiết để load nhanh hơn
     await page.setRequestInterception(true);
     page.on('request', (req) => {
       const resourceType = req.resourceType();
-      // Chặn images, fonts, stylesheets không quan trọng
-      if (['image', 'stylesheet', 'font', 'media'].includes(resourceType)) {
+      // CHỈ chặn images và media (GIỮ LẠI stylesheet và font để trang hiển thị đúng)
+      if (['image', 'media'].includes(resourceType)) {
         req.abort();
       } else {
         req.continue();
       }
     });
+
 
     // Bước 1: Navigate to URL
     console.log(`📍 Đang truy cập: ${url}`);
