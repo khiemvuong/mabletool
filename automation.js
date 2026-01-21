@@ -1,20 +1,173 @@
 const puppeteer = require('puppeteer');
 const fs = require('fs');
-const { execSync } = require('child_process');
+
+// ═══════════════════════════════════════════════════════════════════════════
+// CẤU HÌNH TIMEOUT VÀ RETRY
+// ═══════════════════════════════════════════════════════════════════════════
+const CONFIG = {
+  // Timeout tổng cho mỗi bước (ms) - trang chậm có thể cần tăng lên
+  STEP_TIMEOUT: 60000,        // 60s cho mỗi bước chính
+  
+  // Khoảng cách giữa các lần retry (ms)
+  RETRY_INTERVAL: 500,        // 0.5s
+  
+  // Thời gian đợi sau mỗi action (ms)
+  ACTION_DELAY: 200,          // 0.2s
+  
+  // Không giới hạn số lần retry - chỉ dựa trên timeout
+  // Công thức: số lần retry = STEP_TIMEOUT / RETRY_INTERVAL
+};
 
 /**
- * Tìm Chrome/Edge đã cài sẵn trên Windows
- * @returns {string|null} - Đường dẫn đến Chrome/Edge executable
+ * Helper: Đợi element xuất hiện với timeout
+ * @param {Page} page - Puppeteer page
+ * @param {string[]} selectors - Danh sách selector để thử
+ * @param {number} timeout - Timeout (ms)
+ * @returns {Promise<{element: ElementHandle, selector: string}>}
  */
+async function waitForAnySelector(page, selectors, timeout = CONFIG.STEP_TIMEOUT) {
+  const startTime = Date.now();
+  
+  while (Date.now() - startTime < timeout) {
+    for (const selector of selectors) {
+      try {
+        const element = await page.$(selector);
+        if (element) {
+          // Kiểm tra element có visible không
+          const isVisible = await page.evaluate(el => {
+            const rect = el.getBoundingClientRect();
+            const style = window.getComputedStyle(el);
+            return rect.width > 0 && 
+                   rect.height > 0 && 
+                   style.visibility !== 'hidden' && 
+                   style.display !== 'none';
+          }, element);
+          
+          if (isVisible) {
+            return { element, selector };
+          }
+        }
+      } catch (err) {
+        // Ignore và thử selector tiếp
+      }
+    }
+    
+    // Đợi trước khi retry
+    await page.waitForTimeout(CONFIG.RETRY_INTERVAL);
+    
+    // Log tiến trình mỗi 5s
+    const elapsed = Date.now() - startTime;
+    if (elapsed % 5000 < CONFIG.RETRY_INTERVAL) {
+      console.log(`   ⏳ Đã đợi ${Math.round(elapsed/1000)}s...`);
+    }
+  }
+  
+  return { element: null, selector: null };
+}
+
+/**
+ * Helper: Đợi cho đến khi tìm thấy kết quả phù hợp với keyword
+ * @param {Page} page - Puppeteer page
+ * @param {string} keyword - Từ khóa tìm kiếm
+ * @param {string} submitButtonText - Text của nút submit
+ * @param {number} timeout - Timeout (ms)
+ * @returns {Promise<{found: boolean, element: ElementHandle|null}>}
+ */
+async function waitForResult(page, keyword, submitButtonText, timeout = CONFIG.STEP_TIMEOUT) {
+  const startTime = Date.now();
+  const keywordLower = keyword.toLowerCase();
+  const submitTextLower = submitButtonText.toLowerCase();
+  
+  console.log(`🎯 Đang đợi kết quả chứa "${keyword}" hoặc nút "${submitButtonText}"...`);
+  
+  while (Date.now() - startTime < timeout) {
+    try {
+      // Thử tìm kết quả bằng JavaScript
+      const result = await page.evaluate((kw, st) => {
+        // Tìm tất cả card/item có thể là kết quả
+        const cardSelectors = [
+          '.card', '.item', '.result', '.product', 
+          '[data-name]', '[class*="card"]', '[class*="item"]',
+          'article', '.entry', '.post', '.listing'
+        ];
+        
+        let allCards = [];
+        cardSelectors.forEach(sel => {
+          try {
+            const cards = document.querySelectorAll(sel);
+            cards.forEach(c => {
+              if (!allCards.includes(c)) allCards.push(c);
+            });
+          } catch(e) {}
+        });
+        
+        // Tìm card chứa keyword
+        for (const card of allCards) {
+          const text = (card.textContent || '').toLowerCase();
+          const dataName = (card.dataset?.name || '').toLowerCase();
+          
+          if (text.includes(kw) || dataName.includes(kw)) {
+            // Tìm nút trong card
+            const btn = card.querySelector('button, .btn, [role="button"], input[type="submit"], a.btn');
+            if (btn) {
+              const rect = btn.getBoundingClientRect();
+              if (rect.width > 0 && rect.height > 0) {
+                return { 
+                  found: true, 
+                  method: 'card-button',
+                  cardText: dataName || text.substring(0, 30)
+                };
+              }
+            }
+          }
+        }
+        
+        // Tìm button có text match với submitButtonText
+        const allButtons = document.querySelectorAll('button, .btn, .btn-submit, [role="button"]');
+        for (const btn of allButtons) {
+          const btnText = (btn.textContent || btn.value || '').toLowerCase().trim();
+          if (btnText.includes(st)) {
+            const rect = btn.getBoundingClientRect();
+            if (rect.width > 0 && rect.height > 0) {
+              return { found: true, method: 'submit-button', buttonText: btnText };
+            }
+          }
+        }
+        
+        return { found: false };
+      }, keywordLower, submitTextLower);
+      
+      if (result.found) {
+        console.log(`✅ Tìm thấy kết quả! (${result.method})`);
+        return { found: true };
+      }
+    } catch (err) {
+      // Ignore và retry
+    }
+    
+    await page.waitForTimeout(CONFIG.RETRY_INTERVAL);
+    
+    // Log tiến trình mỗi 5s
+    const elapsed = Date.now() - startTime;
+    if (elapsed % 5000 < CONFIG.RETRY_INTERVAL) {
+      console.log(`   ⏳ Đang đợi kết quả... ${Math.round(elapsed/1000)}s`);
+    }
+  }
+  
+  return { found: false };
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// BROWSER PATH FINDERS
+// ═══════════════════════════════════════════════════════════════════════════
+
 function findChromePath() {
   const chromePaths = [
-    // Chrome paths
     'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
     'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
     process.env.LOCALAPPDATA + '\\Google\\Chrome\\Application\\chrome.exe',
     process.env.PROGRAMFILES + '\\Google\\Chrome\\Application\\chrome.exe',
     process.env['PROGRAMFILES(X86)'] + '\\Google\\Chrome\\Application\\chrome.exe',
-    // Edge paths (Chromium-based)
     'C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe',
     'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe',
     process.env.PROGRAMFILES + '\\Microsoft\\Edge\\Application\\msedge.exe',
@@ -23,119 +176,91 @@ function findChromePath() {
 
   for (const path of chromePaths) {
     if (path && fs.existsSync(path)) {
-      console.log(`✅ Tìm thấy browser tại: ${path}`);
+      console.log(`✅ Tìm thấy browser: ${path}`);
       return path;
     }
   }
-
   return null;
 }
 
-/**
- * Tìm đường dẫn Opera browser
- * @returns {string|null} - Đường dẫn đến Opera executable
- */
 function findOperaPath() {
-  // Các đường dẫn phổ biến của Opera trên Windows
   const commonPaths = [
-    // Đường dẫn CHÍNH XÁC của user (ưu tiên đầu tiên!)
     'C:\\Users\\My PC\\AppData\\Local\\Programs\\Opera\\opera.exe',
-    
-    // Các đường dẫn phổ biến khác với opera.exe
     process.env.LOCALAPPDATA + '\\Programs\\Opera\\opera.exe',
     'C:\\Program Files\\Opera\\opera.exe',
     'C:\\Program Files (x86)\\Opera\\opera.exe',
-    
-    // Thử với launcher.exe (một số phiên bản Opera dùng launcher)
     process.env.LOCALAPPDATA + '\\Programs\\Opera\\launcher.exe',
     'C:\\Program Files\\Opera\\launcher.exe',
-    'C:\\Program Files (x86)\\Opera\\launcher.exe',
-    
-    // Opera GX
     process.env.LOCALAPPDATA + '\\Programs\\Opera GX\\opera.exe',
     'C:\\Program Files\\Opera GX\\opera.exe',
-    process.env.LOCALAPPDATA + '\\Programs\\Opera GX\\launcher.exe',
-    'C:\\Program Files\\Opera GX\\launcher.exe',
   ];
 
   for (const path of commonPaths) {
     if (fs.existsSync(path)) {
-      console.log(`✅ Tìm thấy Opera tại: ${path}`);
+      console.log(`✅ Tìm thấy Opera: ${path}`);
       return path;
     }
   }
-
-  console.log('⚠️ Không tìm thấy Opera');
   return null;
 }
 
-/**
- * Kiểm tra xem có browser đang chạy với remote debugging không
- * @param {number} port - Port của remote debugging (mặc định: 9222)
- * @returns {Promise<boolean>}
- */
-async function checkBrowserRunning(port = 9222) {
-  try {
-    const response = await fetch(`http://localhost:${port}/json/version`);
-    return response.ok;
-  } catch (error) {
-    return false;
-  }
-}
-
-/**
- * Connect tới browser đang chạy
- * @param {number} port - Port của remote debugging
- * @returns {Promise<Browser>}
- */
 async function connectToExistingBrowser(port = 9222) {
   try {
     const browserURL = `http://localhost:${port}`;
-    console.log(`🔗 Đang kết nối tới browser đang chạy tại port ${port}...`);
+    console.log(`🔗 Đang kết nối tới browser port ${port}...`);
     const browser = await puppeteer.connect({ browserURL });
-    console.log('✅ Đã kết nối thành công tới browser!');
+    console.log('✅ Đã kết nối thành công!');
     return browser;
   } catch (error) {
-    console.error('❌ Không thể kết nối tới browser:', error.message);
-    throw new Error('Không thể kết nối tới browser đang chạy. Vui lòng đảm bảo browser đã mở với remote debugging.');
+    throw new Error(`Không thể kết nối. Browser cần được mở với: --remote-debugging-port=${port}`);
   }
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// MAIN AUTOMATION FUNCTION
+// ═══════════════════════════════════════════════════════════════════════════
+
 /**
- * Chạy automation: F5, search, và click vào kết quả
+ * Chạy automation với luồng xử lý TUẦN TỰ và ĐỢI CHO ĐẾN KHI THÀNH CÔNG
  * 
- * LUỒNG HOẠT ĐỘNG:
- * 1. Mở/kết nối browser
- * 2. Navigate đến URL → Refresh (nếu cần)
- * 3. Tìm search box → Nhập keyword
- * 4. Submit search: Ưu tiên nút Submit bên cạnh search → Fallback Enter
- * 5. Tìm và click kết quả phù hợp với keyword
- * 
- * @param {string} url - URL của trang web
- * @param {string} searchKeyword - Từ khóa tìm kiếm
- * @param {object} options - Tùy chọn
+ * LUỒNG:
+ * [1] Kết nối/Mở browser
+ * [2] Tìm hoặc tạo tab → Navigate → Refresh
+ * [3] Tìm search box (đợi đến khi xuất hiện)
+ * [4] Nhập keyword + Submit (Enter hoặc button)
+ * [5] Đợi kết quả xuất hiện (không có timeout cứng, đợi đến khi thấy)
+ * [6] Click vào kết quả phù hợp
  */
 async function runAutomation(url, searchKeyword, options = {}) {
   let browser;
   let shouldCloseBrowser = true;
-  const TIMEOUT = 30000;
   const debugPort = options.debugPort || 9222;
+  const submitButtonText = options.submitButtonText || 'Submit';
+
+  console.log('');
+  console.log('╔══════════════════════════════════════════════════════════════╗');
+  console.log('║  🍁 MAPLE AUTO SEARCH TOOL - STARTING                        ║');
+  console.log('╚══════════════════════════════════════════════════════════════╝');
+  console.log(`📌 URL: ${url}`);
+  console.log(`📌 Keyword: ${searchKeyword}`);
+  console.log(`📌 Submit Text: ${submitButtonText}`);
+  console.log('');
 
   try {
-    console.log('🌐 Đang khởi động browser...');
-    
     // ═══════════════════════════════════════════════════════════════
     // BƯỚC 1: KẾT NỐI HOẶC MỞ BROWSER
     // ═══════════════════════════════════════════════════════════════
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    console.log('📍 BƯỚC 1: Kết nối Browser');
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    
     if (options.useExistingBrowser !== false) {
-      console.log('🔍 Đang kiểm tra browser đang chạy...');
-      
       try {
         browser = await connectToExistingBrowser(debugPort);
         shouldCloseBrowser = false;
-        console.log('✅ Sử dụng browser đang mở');
       } catch (error) {
-        console.log('⚠️ Không tìm thấy browser đang chạy, sẽ mở browser mới...');
+        console.log('⚠️ ' + error.message);
+        console.log('→ Sẽ mở browser mới...');
       }
     }
     
@@ -148,161 +273,106 @@ async function runAutomation(url, searchKeyword, options = {}) {
           '--no-sandbox',
           '--disable-setuid-sandbox',
           '--disable-blink-features=AutomationControlled',
-          '--disable-features=IsolateOrigins,site-per-process',
-          '--disable-web-security',
-          '--disable-dev-shm-usage',
           '--fast-start',
-          '--disable-extensions-except',
         ]
       };
 
-      let browserFound = false;
-
+      // Tìm browser
       if (options.useOpera !== false) {
         const operaPath = findOperaPath();
         if (operaPath) {
           launchOptions.executablePath = operaPath;
-          console.log('🎭 Sử dụng Opera Browser');
-          browserFound = true;
         }
       }
-
-      if (!browserFound) {
+      
+      if (!launchOptions.executablePath) {
         const chromePath = findChromePath();
         if (chromePath) {
           launchOptions.executablePath = chromePath;
-          console.log('🌐 Sử dụng Chrome/Edge');
-          browserFound = true;
         }
-      }
-
-      if (!browserFound) {
-        console.log('⏳ Đang dùng Puppeteer bundled Chrome...');
       }
 
       browser = await puppeteer.launch(launchOptions);
       shouldCloseBrowser = true;
+      console.log('✅ Đã mở browser mới');
     }
+
+    // ═══════════════════════════════════════════════════════════════
+    // BƯỚC 2: TÌM TAB HOẶC TẠO MỚI → NAVIGATE
+    // ═══════════════════════════════════════════════════════════════
+    console.log('');
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    console.log('📍 BƯỚC 2: Navigate đến URL');
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     
-    // ═══════════════════════════════════════════════════════════════
-    // BƯỚC 1.5: TÌM TAB HIỆN TẠI HOẶC TẠO TAB MỚI
-    // ═══════════════════════════════════════════════════════════════
     let page = null;
     let useExistingTab = false;
     
-    // Nếu đang dùng browser hiện có, thử tìm tab đã mở URL
     if (!shouldCloseBrowser) {
-      console.log('🔎 Đang tìm tab đã mở URL...');
       const pages = await browser.pages();
-      
-      // Parse URL để so sánh
       const targetUrl = new URL(url);
-      const targetOrigin = targetUrl.origin;
-      const targetPath = targetUrl.pathname;
       
+      // Tìm tab đã mở URL tương tự
       for (const p of pages) {
         try {
           const pageUrl = p.url();
           if (pageUrl && pageUrl !== 'about:blank') {
             const currentUrl = new URL(pageUrl);
-            // So sánh origin và pathname (bỏ qua query string)
-            if (currentUrl.origin === targetOrigin && 
-                (currentUrl.pathname === targetPath || currentUrl.pathname.startsWith(targetPath))) {
+            if (currentUrl.origin === targetUrl.origin) {
               page = p;
               useExistingTab = true;
-              console.log(`✅ Tìm thấy tab đang mở: ${pageUrl}`);
+              console.log(`✅ Dùng tab hiện có: ${pageUrl}`);
               break;
             }
           }
-        } catch (e) {
-          continue;
-        }
-      }
-      
-      // Fallback: Dùng tab đầu tiên không phải about:blank
-      if (!page) {
-        for (const p of pages) {
-          if (p.url() !== 'about:blank') {
-            page = p;
-            console.log(`📑 Dùng tab hiện có: ${p.url()}`);
-            break;
-          }
-        }
+        } catch (e) {}
       }
     }
     
-    // Nếu không tìm được tab phù hợp, tạo mới
     if (!page) {
       page = await browser.newPage();
       console.log('📄 Đã tạo tab mới');
     }
 
+    // Cấu hình page
     await page.setUserAgent(
       'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
     );
-
-    await page.setViewport({ width: 1920, height: 1080, deviceScaleFactor: 1 });
+    await page.setViewport({ width: 1920, height: 1080 });
 
     // Maximize window
     try {
       const session = await page.target().createCDPSession();
       const { windowId } = await session.send('Browser.getWindowForTarget');
-      await session.send('Browser.setWindowBounds', {
-        windowId,
-        bounds: { windowState: 'maximized' }
-      });
-    } catch (e) {
-      // Ignore
-    }
+      await session.send('Browser.setWindowBounds', { windowId, bounds: { windowState: 'maximized' } });
+    } catch (e) {}
 
-    // Chặn images & media để tăng tốc (chỉ khi tab mới)
-    if (!useExistingTab) {
-      await page.setRequestInterception(true);
-      page.on('request', (req) => {
-        const resourceType = req.resourceType();
-        if (['image', 'media'].includes(resourceType)) {
-          req.abort();
-        } else {
-          req.continue();
-        }
-      });
-    }
-
-    // ═══════════════════════════════════════════════════════════════
-    // BƯỚC 2: NAVIGATE VÀ REFRESH
-    // ═══════════════════════════════════════════════════════════════
-    
-    // Nếu đang dùng tab đã mở đúng URL → chỉ cần refresh (nhanh hơn!)
+    // Navigate hoặc Refresh
     if (useExistingTab) {
-      console.log('⚡ Dùng tab hiện tại - chỉ cần refresh!');
-      // Chỉ refresh, không navigate
       if (!options.skipRefresh) {
-        console.log('🔄 Đang refresh trang...');
-        await page.reload({ waitUntil: 'domcontentloaded', timeout: TIMEOUT });
-        await page.waitForTimeout(300);
+        console.log('🔄 Refreshing...');
+        await page.reload({ waitUntil: 'domcontentloaded', timeout: CONFIG.STEP_TIMEOUT });
       }
     } else {
-      // Tab mới → cần navigate
-      console.log(`📍 Đang truy cập: ${url}`);
-      await page.goto(url, { 
-        waitUntil: 'domcontentloaded',
-        timeout: TIMEOUT 
-      });
-      await page.waitForTimeout(300);
-
+      console.log(`🌐 Đang truy cập: ${url}`);
+      await page.goto(url, { waitUntil: 'domcontentloaded', timeout: CONFIG.STEP_TIMEOUT });
+      
       if (!options.skipRefresh) {
-        console.log('🔄 Đang refresh trang...');
-        await page.reload({ waitUntil: 'domcontentloaded', timeout: TIMEOUT });
-        await page.waitForTimeout(300);
-      } else {
-        console.log('⚡ Bỏ qua refresh');
+        console.log('🔄 Refreshing...');
+        await page.reload({ waitUntil: 'domcontentloaded', timeout: CONFIG.STEP_TIMEOUT });
       }
     }
+    
+    await page.waitForTimeout(CONFIG.ACTION_DELAY);
+    console.log('✅ Trang đã load');
 
     // ═══════════════════════════════════════════════════════════════
-    // BƯỚC 3: TÌM VÀ NHẬP VÀO SEARCH BOX
+    // BƯỚC 3: TÌM SEARCH BOX (ĐỢI CHO ĐẾN KHI XUẤT HIỆN)
     // ═══════════════════════════════════════════════════════════════
-    console.log(`🔍 Đang tìm kiếm: "${searchKeyword}"`);
+    console.log('');
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    console.log('📍 BƯỚC 3: Tìm Search Box');
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     
     const searchSelectors = options.searchSelector ? 
       [options.searchSelector] :
@@ -321,270 +391,197 @@ async function runAutomation(url, searchKeyword, options = {}) {
         'input[type="text"]'
       ];
 
-    let searchBox = null;
-    let usedSelector = null;
+    console.log('🔍 Đang tìm search box...');
+    const { element: searchBox, selector: usedSelector } = await waitForAnySelector(page, searchSelectors);
     
-    // Retry tìm search box
-    const maxSearchRetries = 10;
-    for (let attempt = 1; attempt <= maxSearchRetries && !searchBox; attempt++) {
-      if (attempt > 1) {
-        console.log(`🔄 Retry ${attempt}/${maxSearchRetries}...`);
-        await page.waitForTimeout(500);
-      }
-      
-      for (const selector of searchSelectors) {
-        try {
-          searchBox = await page.$(selector);
-          if (searchBox) {
-            usedSelector = selector;
-            console.log(`✅ Tìm thấy search box: ${selector}`);
-            break;
-          }
-        } catch (err) {
-          continue;
-        }
-      }
-    }
-
     if (!searchBox) {
-      throw new Error('Không tìm thấy search box trên trang!');
+      throw new Error(`❌ Không tìm thấy search box sau ${CONFIG.STEP_TIMEOUT/1000}s!`);
     }
-
-    // Click và nhập text siêu nhanh bằng JS
-    await searchBox.click();
-    await page.waitForTimeout(100);
     
+    console.log(`✅ Tìm thấy: ${usedSelector}`);
+
+    // ═══════════════════════════════════════════════════════════════
+    // BƯỚC 4: NHẬP KEYWORD VÀ SUBMIT
+    // ═══════════════════════════════════════════════════════════════
+    console.log('');
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    console.log('📍 BƯỚC 4: Nhập Keyword và Submit');
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    
+    // Focus và clear
+    await searchBox.click();
+    await page.waitForTimeout(CONFIG.ACTION_DELAY);
+    
+    // Nhập siêu nhanh bằng JavaScript
     await page.evaluate((el, keyword) => {
+      el.value = '';
       el.value = keyword;
       el.dispatchEvent(new Event('input', { bubbles: true }));
       el.dispatchEvent(new Event('change', { bubbles: true }));
     }, searchBox, searchKeyword);
     
-    console.log('⚡ Đã nhập từ khóa siêu nhanh!');
-
-    // ═══════════════════════════════════════════════════════════════
-    // BƯỚC 4: SUBMIT SEARCH (TỐI ƯU THỨ TỰ ƯU TIÊN)
-    // ═══════════════════════════════════════════════════════════════
-    console.log('🚀 Đang submit search...');
+    console.log(`⚡ Đã nhập: "${searchKeyword}"`);
+    await page.waitForTimeout(CONFIG.ACTION_DELAY);
     
-    let searchSubmitted = false;
-    const submitButtonText = options.submitButtonText || 'Submit';
+    // Submit: Thử tìm nút submit trong form/container trước, nếu không thì Enter
+    let submitted = false;
     
-    // CHIẾN LƯỢC SUBMIT TỐI ƯU:
-    // 1. Tìm nút submit BÊN CẠNH search box (cùng form/container)
-    // 2. Tìm nút submit type="submit" trong form
-    // 3. Tìm nút search icon bên cạnh input
-    // 4. Fallback: Nhấn Enter (hầu hết các page hiện đại đều hỗ trợ)
-    
-    // Thử Method 1: Tìm submit button trong cùng container
     try {
-      const nearbySubmit = await page.evaluate((searchEl) => {
-        // Tìm form chứa search input
+      submitted = await page.evaluate((searchEl) => {
+        // Tìm form chứa input
         const form = searchEl.closest('form');
         if (form) {
-          const submitBtn = form.querySelector('button[type="submit"], input[type="submit"], button:not([type="button"])');
+          const submitBtn = form.querySelector('button[type="submit"], input[type="submit"]');
           if (submitBtn) {
             submitBtn.click();
-            return { clicked: true, method: 'form-submit' };
+            return true;
           }
         }
         
-        // Tìm trong container cha (như .search-wrapper)
-        const wrapper = searchEl.closest('.search-wrapper, .search-container, .search-box, .search-form, [class*="search"]');
+        // Tìm nút search trong container
+        const wrapper = searchEl.closest('[class*="search"]');
         if (wrapper) {
-          const wrapperBtn = wrapper.querySelector('button, [role="button"]');
-          if (wrapperBtn) {
-            wrapperBtn.click();
-            return { clicked: true, method: 'wrapper-button' };
+          const btn = wrapper.querySelector('button, [role="button"]');
+          if (btn) {
+            btn.click();
+            return true;
           }
         }
         
-        // Tìm nút ngay sau input
-        const nextSibling = searchEl.nextElementSibling;
-        if (nextSibling && (nextSibling.tagName === 'BUTTON' || nextSibling.getAttribute('role') === 'button')) {
-          nextSibling.click();
-          return { clicked: true, method: 'adjacent-button' };
-        }
-        
-        return { clicked: false };
+        return false;
       }, searchBox);
-      
-      if (nearbySubmit.clicked) {
-        console.log(`✅ Đã click submit (${nearbySubmit.method})`);
-        searchSubmitted = true;
-      }
     } catch (err) {
-      // Không tìm thấy, sẽ dùng Enter
+      submitted = false;
     }
     
-    // Fallback: Nhấn Enter (cách phổ biến nhất)
-    if (!searchSubmitted) {
-      console.log('⏎ Nhấn Enter để search...');
+    if (!submitted) {
+      console.log('⏎ Nhấn Enter để submit...');
       await searchBox.press('Enter');
-      searchSubmitted = true;
-      console.log('✅ Đã nhấn Enter');
+    } else {
+      console.log('🔘 Đã click nút submit');
+    }
+    
+    console.log('✅ Đã submit search');
+
+    // ═══════════════════════════════════════════════════════════════
+    // BƯỚC 5: ĐỢI KẾT QUẢ XUẤT HIỆN
+    // ═══════════════════════════════════════════════════════════════
+    console.log('');
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    console.log('📍 BƯỚC 5: Đợi Kết Quả');
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    
+    // Đợi một chút cho search bắt đầu xử lý
+    await page.waitForTimeout(500);
+    
+    // Đợi kết quả xuất hiện
+    const resultCheck = await waitForResult(page, searchKeyword, submitButtonText);
+    
+    if (!resultCheck.found) {
+      console.log('⚠️ Timeout đợi kết quả, nhưng sẽ thử click anyway...');
     }
 
-    // Đợi kết quả load
-    console.log('⏳ Đang đợi kết quả...');
-    await page.waitForTimeout(1500);
-
     // ═══════════════════════════════════════════════════════════════
-    // BƯỚC 5: TÌM VÀ CLICK KẾT QUẢ PHÙ HỢP
+    // BƯỚC 6: CLICK VÀO KẾT QUẢ PHÙ HỢP
     // ═══════════════════════════════════════════════════════════════
-    console.log(`🎯 Tìm kết quả chứa "${searchKeyword}" hoặc nút "${submitButtonText}"...`);
+    console.log('');
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    console.log('📍 BƯỚC 6: Click Kết Quả');
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     
-    let clickSuccess = false;
-    const maxClickRetries = 5;
     const keywordLower = searchKeyword.toLowerCase();
     const submitTextLower = submitButtonText.toLowerCase();
     
-    for (let attempt = 1; attempt <= maxClickRetries && !clickSuccess; attempt++) {
-      if (attempt > 1) {
-        console.log(`🔄 Retry click ${attempt}/${maxClickRetries}...`);
-        await page.waitForTimeout(1000);
+    // Thực hiện click
+    const clickResult = await page.evaluate((kw, st) => {
+      // Tìm card chứa keyword
+      const cardSelectors = [
+        '.card', '.item', '.result', '.product', 
+        '[data-name]', '[class*="card"]', '[class*="item"]',
+        'article', '.entry', '.post', '.listing'
+      ];
+      
+      let allCards = [];
+      cardSelectors.forEach(sel => {
+        try {
+          document.querySelectorAll(sel).forEach(c => {
+            if (!allCards.includes(c)) allCards.push(c);
+          });
+        } catch(e) {}
+      });
+      
+      // Phương pháp 1: Card chứa keyword → click button trong đó
+      for (const card of allCards) {
+        const text = (card.textContent || '').toLowerCase();
+        const dataName = (card.dataset?.name || '').toLowerCase();
+        
+        if (text.includes(kw) || dataName.includes(kw)) {
+          const btn = card.querySelector('button, .btn, [role="button"], input[type="submit"], a.btn');
+          if (btn) {
+            btn.scrollIntoView({ behavior: 'instant', block: 'center' });
+            btn.click();
+            return { success: true, method: 'card-button', detail: dataName || text.substring(0, 30) };
+          }
+          
+          // Card có thể click?
+          if (card.tagName === 'A' || card.onclick) {
+            card.click();
+            return { success: true, method: 'card-click', detail: dataName };
+          }
+        }
       }
       
-      try {
-        // PHƯƠNG PHÁP 1: Tìm card/item có chứa keyword VÀ có nút bấm
-        const cardResult = await page.evaluate((keyword, submitText) => {
-          const kw = keyword.toLowerCase();
-          const st = submitText.toLowerCase();
-          
-          // Tìm tất cả các card/item có thể là kết quả
-          const cardSelectors = [
-            '.card', '.item', '.result', '.product', 
-            '[data-name]', '[class*="card"]', '[class*="item"]', '[class*="result"]',
-            'article', '.entry', '.post'
-          ];
-          
-          let allCards = [];
-          cardSelectors.forEach(sel => {
-            try {
-              const cards = document.querySelectorAll(sel);
-              cards.forEach(c => {
-                if (!allCards.includes(c)) allCards.push(c);
-              });
-            } catch(e) {}
-          });
-          
-          // Lọc card có chứa keyword
-          for (const card of allCards) {
-            const text = (card.textContent || '').toLowerCase();
-            const dataName = (card.dataset?.name || '').toLowerCase();
-            
-            if (text.includes(kw) || dataName.includes(kw)) {
-              // Tìm nút trong card này
-              const btn = card.querySelector('button, .btn, [role="button"], input[type="submit"]');
-              if (btn) {
-                // Scroll và click
-                btn.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                btn.click();
-                return { success: true, method: 'card-button', text: btn.textContent?.trim() };
-              }
-              
-              // Nếu card có thể click được
-              if (card.onclick || card.getAttribute('role') === 'button') {
-                card.click();
-                return { success: true, method: 'clickable-card', text: card.dataset?.name };
-              }
-            }
-          }
-          
-          // PHƯƠNG PHÁP 2: Tìm button có text match với submitButtonText
-          const allButtons = document.querySelectorAll('button, .btn, .btn-submit, [role="button"], input[type="submit"]');
-          for (const btn of allButtons) {
-            const btnText = (btn.textContent || btn.value || '').toLowerCase().trim();
-            if (btnText.includes(st)) {
-              btn.scrollIntoView({ behavior: 'smooth', block: 'center' });
-              btn.click();
-              return { success: true, method: 'submit-text-match', text: btnText };
-            }
-          }
-          
-          // PHƯƠNG PHÁP 3: Tìm link/card có chứa keyword
-          const links = document.querySelectorAll('a[href], [onclick]');
-          for (const link of links) {
-            const text = (link.textContent || '').toLowerCase();
-            if (text.includes(kw)) {
-              link.click();
-              return { success: true, method: 'keyword-link', text: text.substring(0, 50) };
-            }
-          }
-          
-          return { success: false };
-        }, searchKeyword, submitButtonText);
-        
-        if (cardResult.success) {
-          console.log(`✅ Đã click: ${cardResult.method} - "${cardResult.text}"`);
-          clickSuccess = true;
-          break;
+      // Phương pháp 2: Button có text match submitButtonText
+      const buttons = document.querySelectorAll('button, .btn, .btn-submit, [role="button"]');
+      for (const btn of buttons) {
+        const btnText = (btn.textContent || btn.value || '').toLowerCase().trim();
+        if (btnText.includes(st)) {
+          btn.scrollIntoView({ behavior: 'instant', block: 'center' });
+          btn.click();
+          return { success: true, method: 'submit-button', detail: btnText };
         }
-        
-        // PHƯƠNG PHÁP 4: Tìm bằng Puppeteer (chính xác hơn)
-        if (!clickSuccess) {
-          const buttons = await page.$$('button, .btn, .btn-submit, [role="button"]');
-          console.log(`📋 Tìm thấy ${buttons.length} buttons`);
-          
-          for (const btn of buttons) {
-            try {
-              const btnInfo = await page.evaluate(el => ({
-                text: (el.textContent || el.value || '').trim(),
-                visible: el.offsetParent !== null,
-                rect: el.getBoundingClientRect()
-              }), btn);
-              
-              if (!btnInfo.visible || btnInfo.rect.width === 0) continue;
-              
-              console.log(`   - "${btnInfo.text}"`);
-              
-              if (btnInfo.text.toLowerCase().includes(submitTextLower) || 
-                  btnInfo.text.toLowerCase().includes(keywordLower)) {
-                await page.evaluate(el => el.scrollIntoView({ behavior: 'smooth', block: 'center' }), btn);
-                await page.waitForTimeout(200);
-                await btn.click();
-                console.log(`✅ Đã click: "${btnInfo.text}"`);
-                clickSuccess = true;
-                break;
-              }
-            } catch (btnErr) {
-              continue;
-            }
-          }
-        }
-        
-      } catch (err) {
-        console.error(`⚠️ Lỗi attempt ${attempt}:`, err.message);
       }
-    }
-
-    // Final status
-    if (clickSuccess) {
-      console.log('✨ Hoàn thành automation thành công!');
+      
+      // Phương pháp 3: Link chứa keyword
+      const links = document.querySelectorAll('a[href]');
+      for (const link of links) {
+        const text = (link.textContent || '').toLowerCase();
+        if (text.includes(kw) && link.offsetParent !== null) {
+          link.click();
+          return { success: true, method: 'keyword-link', detail: text.substring(0, 30) };
+        }
+      }
+      
+      return { success: false };
+    }, keywordLower, submitTextLower);
+    
+    if (clickResult.success) {
+      console.log(`✅ Đã click thành công!`);
+      console.log(`   → Phương pháp: ${clickResult.method}`);
+      console.log(`   → Chi tiết: "${clickResult.detail}"`);
     } else {
       console.log('⚠️ Không tìm thấy kết quả phù hợp để click');
       console.log('💡 Tip: Kiểm tra lại keyword hoặc submitButtonText');
     }
+
+    // ═══════════════════════════════════════════════════════════════
+    // HOÀN THÀNH
+    // ═══════════════════════════════════════════════════════════════
+    console.log('');
+    console.log('╔══════════════════════════════════════════════════════════════╗');
+    console.log('║  ✨ AUTOMATION HOÀN THÀNH!                                   ║');
+    console.log('╚══════════════════════════════════════════════════════════════╝');
     
     if (!shouldCloseBrowser) {
-      console.log('✅ Tab automation hoàn thành! Browser vẫn mở.');
+      console.log('💡 Browser vẫn mở - tab automation đã hoàn thành');
     }
 
   } catch (error) {
-    console.error('❌ Lỗi automation:', error.message);
-    
-    if (error.message.includes('Could not find Chrome') || error.message.includes('Could not find browser')) {
-      console.error(`
-╔════════════════════════════════════════════════════════════════╗
-║  ❌ KHÔNG TÌM THẤY BROWSER!                                    ║
-╚════════════════════════════════════════════════════════════════╝
-
-💡 GIẢI PHÁP:
-1️⃣ npx puppeteer browsers install chrome
-2️⃣ Cài Chrome: https://www.google.com/chrome/
-3️⃣ Cài Opera: https://www.opera.com/
-      `);
-    }
+    console.error('');
+    console.error('╔══════════════════════════════════════════════════════════════╗');
+    console.error('║  ❌ LỖI AUTOMATION                                           ║');
+    console.error('╚══════════════════════════════════════════════════════════════╝');
+    console.error('→', error.message);
     
     // Screenshot on error
     if (browser) {
@@ -592,11 +589,11 @@ async function runAutomation(url, searchKeyword, options = {}) {
         const pages = await browser.pages();
         if (pages.length > 0) {
           const timestamp = Date.now();
-          await pages[0].screenshot({ 
+          await pages[pages.length - 1].screenshot({ 
             path: `error-${timestamp}.png`,
             fullPage: true 
           });
-          console.log(`📸 Screenshot: error-${timestamp}.png`);
+          console.log(`📸 Screenshot lỗi: error-${timestamp}.png`);
         }
       } catch (screenshotErr) {}
     }
